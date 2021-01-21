@@ -58,3 +58,33 @@ plugin.methods.register_function(
                  'of AGP or other large datasets.')
 )
 
+plugin.methods.register_function(
+    function=pad_features_in_test_data,
+    inputs={'train_table': FeatureTable[RelativeFrequency],
+            'test_table': FeatureTable[RelativeFrequency]
+    },
+    outputs=[
+            ('new_test_table': FeatureTable[RelativeFrequency])
+            ],
+    input_descriptions={
+        'train_table': ('The feature table of train data containing' 
+        'samples and features which was used for constructing a age-prediction model.'),
+        'test_table': ('The feature table of test data containing' 
+        'the samples and features which will be used for age prediction.')
+
+    },
+    parameters={
+    },
+    parameter_descriptions={
+    },
+    output_descriptions={
+        'new_test_table': ('The updated test table with identical features to train data.'
+        'The train-data-unique features were padded with zero in test data, while shared 
+        'features with train table will be kept in the output table.'
+            )},
+    name='pad_features_in_test_data',
+    description=('Align features between train and test tables. The train-data-unique features 
+                'were padded with zero in test data, while shared features with train table 
+                'will be kept in the output table.')
+)
+
