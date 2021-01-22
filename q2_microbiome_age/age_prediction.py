@@ -74,7 +74,7 @@ def age_prediction_with_trained_model(q2_model: qiime2.sample_estimator,
     
     return updated_test_metadata
 
-def _age_prediction_with_train_data(train_table, train_metadata, train_target_field, test_table, test_metadata):
+def _age_prediction_with_train_data(train_table, train_metadata, train_target_field, test_table):
     '''
     Predict age in the test microbiome dataset based on a trained model.
     Parameters
@@ -115,9 +115,14 @@ def _age_prediction_with_train_data(train_table, train_metadata, train_target_fi
     return updated_test_metadata
 
 def age_prediction_with_train_data(train_table: biom.Table, 
-                                    train_metadata:qiime2.MetadataColumn, 
+                                    train_metadata:qiime2.Metadata, 
+                                    train_target_field:str,
                                     test_table:biom.Table, 
-                                    test_metadata:qiime2.MetadataColumn):
+                                    test_metadata: qiime2.metadata,
+                                    n_jobs_or_threads: int = 4,
+                                    cv: int = 5,
+                                    n_estimators: int = 500,
+                                    parameter_tuning: bool = False) -> pd.DataFrame:
     '''
     Predict age in the test microbiome dataset based on a trained model.
     Parameters
@@ -136,25 +141,26 @@ def age_prediction_with_train_data(train_table: biom.Table,
     updated_test_metadata: A pd.DataFrame with an updated test metadata where
         microbiome age has been inerted into the last column.
     '''
-    try:
-        train_y=train_metadata[train_target_field]
-        except NameError:
-            print("The train_target_field is not found!")
     
     # Filter metadata to only include IDs present in the table.
     # Also ensures every distance table ID is present in the metadata.
-    metadata = metadata.filter_ids(table.ids(axis='sample'))
-    metadata = metadata.drop_missing_values()    
+    train_metadata = train_metadata.filter_ids(train_table.ids(axis='sample'))
+    train_metadata = train_metadata.drop_missing_values() 
+    # filter sample IDs with missing values in the train_table
+    train_table = train_table.filter(metadata.ids) 
 
     train_table_q2 = Artifact.import_data("FeatureTable[Frequency]", train_table)
     train_metadata_q2 = q2.Metadata(train_metadata) # q2 metadata
     train_y_q2=train_metadata_q2.get_column(train_target_field)
 
-    test_table_q2 = Artifact.import_data("FeatureTable[Frequency]", test_table)
-    test_metadata_q2 = q2.Metadata(test_metadata) # q2 metadata
-    out = regress_samples(q2_train_X, q2_train_y, cv=5, n_jobs=8, n_estimators=500, parameter_tuning=False)
+    
+    # train the model with q2-sample-classifier
+    out = regress_samples(q2_train_X, q2_train_y, cv=cv, n_jobs=n_jobs_or_threads, n_estimators=n_estimators, parameter_tuning=parameter_tuning)
     q2_model = out.sample_estimator
 
+    # age prediction in the test table 
+    test_table_q2 = Artifact.import_data("FeatureTable[Frequency]", test_table)
+    #test_metadata_q2 = q2.Metadata(test_metadata) # q2 metadata
     predictions=predict_regression(test_table_q2, q2_model).predictions
     #predictions.save(OUTDIR+'test_predictions.qza')
 

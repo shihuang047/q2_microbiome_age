@@ -41,7 +41,8 @@ def _pad_features_in_test_data(train_df, test_df):
     #new_test_df_qza=q2.Artifact.import_data('FeatureTable[Frequency]', new_test_df)
     return new_test_df
 
-def pad_features_in_test_data(train_table: biom.Table, test_table: biom.Table) -> biom.Table:
+def pad_features_in_test_data(train_table: biom.Table, 
+                                test_table: biom.Table) -> biom.Table:
     '''
     Do feature alignment on train and test tables by adding zero-padding features that
     only existed in the train table into test table.
@@ -59,10 +60,12 @@ def pad_features_in_test_data(train_table: biom.Table, test_table: biom.Table) -
     A biom table with the updated test data with identical set of
         features in the train table.
     '''
-    
+
     train_feature_ids = train_table.ids(axis='observation')
     test_feature_ids = test_table.ids(axis='observation')
+
     n_samples = test_table.shape[0]
+    #n_features = test_table.shape[1]
     sample_ids= test_table.ids(axis='sample')
     #print("The # of features in the train data: ", len(train_feature_ids))
     #print("The # of features in the original test data: ", len(test_feature_ids))
@@ -73,9 +76,12 @@ def pad_features_in_test_data(train_table: biom.Table, test_table: biom.Table) -
                                 train_uniq_f, sample_ids)
     # filter out features that don't exist in the train table in the test table
     test_table.filter(shared_f, axis='observation')
+
+    n_filtered_features = test_table.shape[1]
+    if n_filtered_features == 0:
+        raise ValueError('No feature overlap between train and test table!'
+                         'Check the feature-format consistentcy between tables!')
     # merge the two tables
     new_test_table = test_table.merge(padding_table)
 
     return new_test_table
-
-
