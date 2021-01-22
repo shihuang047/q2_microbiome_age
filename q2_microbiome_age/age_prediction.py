@@ -30,8 +30,8 @@ def _age_prediction_with_trained_model(q2_model, test_table, test_metadata):
         equivalent percentile in "control" samples.
     Returns
     -------
-    test_df_padded: A pd.DataFrame with an updated test data with equal number of
-        feature as the train data.
+    updated_test_metadata: A pd.DataFrame with an updated test metadata where
+        microbiome age has been inerted into the last column.
     '''
 
     #q2_model=q2.Artifact.load(q2_model)
@@ -74,7 +74,7 @@ def age_prediction_with_trained_model(q2_model: qiime2.sample_estimator,
     
     return updated_test_metadata
 
-def _age_prediction_with_train_data(train_table, train_metadata, train_target_field, test_table, test_metadata, retrain=False):
+def _age_prediction_with_train_data(train_table, train_metadata, train_target_field, test_table, test_metadata):
     '''
     Predict age in the test microbiome dataset based on a trained model.
     Parameters
@@ -88,8 +88,8 @@ def _age_prediction_with_train_data(train_table, train_metadata, train_target_fi
         equivalent percentile in "control" samples.
     Returns
     -------
-    test_df_padded: A pd.DataFrame with an updated test data with equal number of
-        feature as the train data.
+    updated_test_metadata: A pd.DataFrame with an updated test metadata where
+        microbiome age has been inerted into the last column.
     '''
     try:
         train_y=train_metadata[train_target_field]
@@ -114,6 +114,55 @@ def _age_prediction_with_train_data(train_table, train_metadata, train_target_fi
     
     return updated_test_metadata
 
+def age_prediction_with_train_data(train_table: biom.Table, 
+                                    train_metadata:qiime2.MetadataColumn, 
+                                    test_table:biom.Table, 
+                                    test_metadata:qiime2.MetadataColumn):
+    '''
+    Predict age in the test microbiome dataset based on a trained model.
+    Parameters
+    ----------
+    train_table: biom.Table
+        Feature table with relative abundances for model training. Samples are in columns,
+        features (i.e. OTUs) are in rows.
+    train_metadata : qiime2.MetadataColumn
+        metadata column with samples labeled as age values ranging from 0 to 120.
+    test_table: Feature table with relative abundances for model testing. Samples are in columns,
+        features (i.e. OTUs) are in rows.
+    test_metadata : qiime2.MetadataColumn
+        metadata column with samples labeled as age values ranging from 0 to 120.
+    Returns
+    -------
+    updated_test_metadata: A pd.DataFrame with an updated test metadata where
+        microbiome age has been inerted into the last column.
+    '''
+    try:
+        train_y=train_metadata[train_target_field]
+        except NameError:
+            print("The train_target_field is not found!")
+    
+    # Filter metadata to only include IDs present in the table.
+    # Also ensures every distance table ID is present in the metadata.
+    metadata = metadata.filter_ids(table.ids(axis='sample'))
+    metadata = metadata.drop_missing_values()    
 
+    train_table_q2 = Artifact.import_data("FeatureTable[Frequency]", train_table)
+    train_metadata_q2 = q2.Metadata(train_metadata) # q2 metadata
+    train_y_q2=train_metadata_q2.get_column(train_target_field)
+
+    test_table_q2 = Artifact.import_data("FeatureTable[Frequency]", test_table)
+    test_metadata_q2 = q2.Metadata(test_metadata) # q2 metadata
+    out = regress_samples(q2_train_X, q2_train_y, cv=5, n_jobs=8, n_estimators=500, parameter_tuning=False)
+    q2_model = out.sample_estimator
+
+    predictions=predict_regression(test_table_q2, q2_model).predictions
+    #predictions.save(OUTDIR+'test_predictions.qza')
+
+    test_pred_df=predictions.view(pd.Series)
+
+    updated_test_metadata = pd.concat([test_metadata, test_pred_df], axis=1, sort=False)
+    #result.to_csv(OUTDIR+'test_predictions_metadata.tsv',sep='\t') 
+    
+    return updated_test_metadata
 
 
